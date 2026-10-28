@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>異次元 | 異次元のA</title>
+  <style>
+    :root {
+      --black: #02050b;
+      --navy-0: #07101c;
+      --navy-1: #0b1630;
+      --navy-2: #13244a;
+      --blue: #22487c;
+      --red: #431019;
+      --text: rgba(241, 246, 255, 0.95);
+      --muted: rgba(210, 221, 243, 0.64);
+      --border: rgba(170, 194, 228, 0.12);
+      --title-fade: 1;
+      --ghost-shift: 0px;
+      --ghost-alpha: 0;
+      --field-glow: 0.2;
+      --field-grid: 0.16;
+      --field-shift-x: 0px;
+      --field-shift-y: 0px;
+      --world-tint: 0;
+      --world-depth: 0;
+      --world-grid-size: 36px;
+      --world-layer-shift-x: 0px;
+      --world-layer-shift-y: 0px;
+      --world-tilt: 0deg;
+      --terrain-shear-x: 0px;
+      --terrain-shear-y: 0px;
+      --terrain-scale: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: linear-gradient(180deg, #08111f 0%, #050b15 42%, #02050b 100%);
+      color: var(--text);
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .world {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 18%),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, #0b1730 100%, #13254a calc(var(--world-tint) * 22%)) 0%,
+          color-mix(in srgb, #07101c 100%, #102348 calc(var(--world-tint) * 14%)) 44%,
+          color-mix(in srgb, #02050b 100%, #08111f calc(var(--world-tint) * 12%)) 100%
+        );
+    }
+
+    .world::before,
+    .world::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .world::before {
+      background:
+        radial-gradient(
+          circle at calc(50% + var(--field-shift-x)) calc(42% + var(--field-shift-y)),
+          rgba(76, 120, 188, calc(var(--field-glow) * 0.74)) 0%,
+          rgba(28, 52, 96, calc(var(--field-glow) * 0.52)) 14%,
+          rgba(12, 22, 42, calc(var(--field-glow) * 0.26)) 28%,
+          transparent 48%
+        ),
+        radial-gradient(circle at 50% 60%, rgba(12, 26, 48, 0.18), transparent 28%);
+    }
+
+    .world::after {
+      background-image:
+        linear-gradient(rgba(148, 174, 214, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 174, 214, 0.018) 1px, transparent 1px);
+      background-size: var(--world-grid-size) var(--world-grid-size);
+      opacity: var(--field-grid);
+      transform:
+        translate3d(
+          calc(var(--world-depth) * 6px + var(--world-layer-shift-x)),
+          calc(var(--world-depth) * -4px + var(--world-layer-shift-y)),
+          0
+        )
+        skewX(var(--world-tilt));
+    }
+
+    .terrain-field {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .terrain-drift {
+      position: absolute;
+      inset: -2%;
+      animation: terrainDrift 36s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+
+    #terrainCanvas {
+      width: 104%;
+      height: 104%;
+      display: block;
+      image-rendering: pixelated;
+      will-change: transform;
+      transform:
+        translate3d(var(--terrain-shear-x), var(--terrain-shear-y), 0)
+        scale(calc(1 + var(--terrain-scale)));
+    }
+
+    @keyframes terrainDrift {
+      0% {
+        transform: translate3d(-10px, -8px, 0);
+      }
+
+      100% {
+        transform: translate3d(12px, 10px, 0);
+      }
+    }
+
+    .site-header {
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 32px;
+      background: linear-gradient(180deg, rgba(2, 5, 11, 0.9), rgba(2, 5, 11, 0));
+      backdrop-filter: blur(4px);
+    }
+
+    .brand {
+      font-size: 12px;
+      letter-spacing: 0.28em;
+      color: rgba(244, 248, 255, 0.92);
+    }
+
+    .site-nav {
+      display: flex;
+      gap: 24px;
+      color: rgba(216, 228, 248, 0.72);
+      font-size: 11px;
+      letter-spacing: 0.22em;
+    }
+
+    .site-nav a:hover,
+    .site-nav a:focus-visible {
+      color: rgba(244, 248, 255, 0.96);
+      outline: none;
+    }
+
+    .hero-stage {
+      position: relative;
+      min-height: 185vh;
+      z-index: 3;
+    }
+
+    .hero-sticky {
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 112px 24px 48px;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .hero-shell {
+      position: relative;
+      z-index: 10;
+      width: min(1100px, 100%);
+      display: grid;
+      gap: 22px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .hero-kicker {
+      font-size: 11px;
+      letter-spacing: 0.32em;
+      color: rgba(212, 224, 244, 0.56);
+      opacity: var(--title-fade);
+      transition: opacity 0.22s ease;
+    }
+
+    .hero-title {
+      position: relative;
+      z-index: 12;
+      display: inline-block;
+      font-size: clamp(72px, 14vw, 196px);
+      line-height: 0.88;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: rgba(244, 248, 255, 0.97);
+      opacity: var(--title-fade);
+      transition:
+        opacity 0.22s ease,
+        filter 0.22s ease;
+    }
+
+    .hero-title::before,
+    .hero-title::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .hero-title::before {
+      color: rgba(196, 220, 255, var(--ghost-alpha));
+      transform: translateX(calc(var(--ghost-shift) * -1));
+    }
+
+    .hero-title::after {
+      color: rgba(92, 132, 216, calc(var(--ghost-alpha) * 0.72));
+      transform: translateX(var(--ghost-shift));
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      display: grid;
+      gap: 16px;
+      opacity: calc(var(--title-fade) * 0.92);
+      transition: opacity 0.22s ease;
+    }
+
+    .hero-copy h2 {
+      font-size: clamp(26px, 4.2vw, 56px);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      line-height: 1.08;
+    }
+
+    .hero-copy p {
+      color: var(--muted);
+      font-size: clamp(14px, 1.35vw, 18px);
+      line-height: 1.95;
+      letter-spacing: 0.08em;
+    }
+
+    .hero-guide {
+      padding-top: 8px;
+      color: rgba(208, 220, 244, 0.48);
+      font-size: 11px;
+      letter-spacing: 0.24em;
+      opacity: var(--title-fade);
+      transition: opacity 0.22s ease;
+    }
+
+    main {
+      position: relative;
+      z-index: 2;
+      margin-top: -100vh;
+      padding-top: 100vh;
+    }
+
+    .section {
+      position: relative;
+      min-height: 118vh;
+      padding: 178px 9vw 162px;
+      background: transparent;
+      --section-progress: 0;
+      --section-drift: 0px;
+      --section-content-shift: 0px;
+      --section-axis: 1;
+      isolation: isolate;
+    }
+
+    .section::before,
+    .section::after {
+      content: "";
+      position: absolute;
+      inset: 42px 4vw 42px;
+      pointer-events: none;
+      transition:
+        opacity 0.42s ease,
+        transform 0.42s ease,
+        clip-path 0.42s ease;
+    }
+
+    .section::before {
+      z-index: 0;
+      background:
+        linear-gradient(180deg, rgba(7, 13, 22, 0.84), rgba(4, 8, 16, 0.95)),
+        linear-gradient(90deg, rgba(129, 158, 208, 0.04) 1px, transparent 1px),
+        linear-gradient(rgba(129, 158, 208, 0.035) 1px, transparent 1px);
+      background-size: auto, 16px 16px, 16px 16px;
+      clip-path: polygon(2% 8%, 78% 0%, 100% 16%, 96% 90%, 20% 100%, 0% 82%);
+      opacity: calc(0.18 + var(--section-progress) * 0.38);
+      transform:
+        translate3d(var(--section-drift), calc(42px - var(--section-progress) * 42px), 0)
+        scale(calc(0.95 + var(--section-progress) * 0.05));
+      box-shadow:
+        0 0 0 1px rgba(160, 188, 230, 0.08),
+        0 18px 60px rgba(0, 0, 0, 0.22);
+    }
+
+    .section::after {
+      z-index: 0;
+      inset: 64px 7vw 64px;
+      background:
+        linear-gradient(
+          90deg,
+          transparent,
+          rgba(82, 118, 180, 0.1),
+          rgba(80, 20, 28, 0.04),
+          transparent
+        );
+      clip-path: polygon(0% 20%, 56% 0%, 100% 22%, 70% 100%, 12% 88%);
+      opacity: calc(0.04 + var(--section-progress) * 0.18);
+      transform: translate3d(calc(var(--section-drift) * -0.5), 0, 0);
+      filter: blur(10px);
+    }
+
+    .section-inner {
+      position: relative;
+      z-index: 2;
+      width: min(1100px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 48px;
+      transform: translate3d(var(--section-content-shift), 0, 0);
+      transition: transform 0.28s ease;
+    }
+
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: rgba(202, 218, 244, 0.54);
+    }
+
+    .section-title {
+      font-size: clamp(54px, 8vw, 132px);
+      font-weight: 400;
+      line-height: 0.92;
+      letter-spacing: -0.05em;
+    }
+
+    .section-copy {
+      max-width: 760px;
+      color: rgba(218, 228, 244, 0.74);
+      font-size: clamp(16px, 1.7vw, 22px);
+      line-height: 2;
+      letter-spacing: 0.06em;
+    }
+
+    .about-grid,
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .panel,
+    .work-card {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(10, 18, 30, 0.94), rgba(7, 13, 22, 0.96)),
+        linear-gradient(90deg, rgba(118, 150, 194, 0.045) 1px, transparent 1px),
+        linear-gradient(rgba(118, 150, 194, 0.035) 1px, transparent 1px);
+      background-size: auto, 12px 12px, 12px 12px;
+      box-shadow:
+        0 0 0 1px rgba(158, 184, 220, 0.03),
+        0 18px 38px rgba(0, 0, 0, 0.12);
+      transform: translate3d(0, 0, 0);
+      transition:
+        transform 0.4s ease,
+        opacity 0.4s ease,
+        filter 0.4s ease,
+        border-color 0.4s ease,
+        clip-path 0.4s ease;
+    }
+
+    .panel::before,
+    .work-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(210, 226, 255, 0.04), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.12)),
+        linear-gradient(rgba(136, 164, 208, 0.032) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(136, 164, 208, 0.028) 1px, transparent 1px);
+      background-size: auto, 14px 14px, 14px 14px;
+      opacity: 0.7;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .panel::after,
+    .work-card::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(160, 190, 236, 0.24), transparent);
+      opacity: 0.48;
+      pointer-events: none;
+    }
+
+    .panel h3,
+    .work-card h3 {
+      margin-bottom: 16px;
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+    }
+
+    .panel p,
+    .work-card p {
+      position: relative;
+      z-index: 1;
+      color: rgba(212, 224, 244, 0.66);
+      line-height: 1.9;
+      letter-spacing: 0.04em;
+    }
+
+    .panel h3,
+    .work-card h3 {
+      position: relative;
+      z-index: 1;
+    }
+
+    .skill-work-layout {
+      display: grid;
+      gap: 34px;
+    }
+
+    .interest-list,
+    .profile-list,
+    .fragment-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .interest-item,
+    .profile-item,
+    .fragment-tag {
+      position: relative;
+      padding: 12px 16px;
+      border: 1px solid rgba(154, 182, 224, 0.12);
+      background: rgba(10, 16, 28, 0.94);
+      color: rgba(226, 236, 252, 0.76);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      transform: translate3d(0, calc((1 - var(--section-progress)) * 8px), 0);
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .panel-wide {
+      grid-column: 1 / -1;
+    }
+
+    .meta-line {
+      color: rgba(218, 228, 244, 0.62);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .fragment-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .fragment-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(232, 239, 252, 0.8);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .fragment-status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(120, 168, 238, 0.84);
+      box-shadow: 0 0 12px rgba(120, 168, 238, 0.3);
+    }
+
+    .works-grid {
+      position: relative;
+      perspective: 1000px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      padding-top: 12px;
+    }
+
+    .works-grid::before {
+      content: "";
+      position: absolute;
+      inset: 0 4% auto;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(162, 188, 230, 0.18), transparent);
+      opacity: 0.4;
+    }
+
+    .panel {
+      clip-path: polygon(0 4%, 94% 0, 100% 16%, 100% 100%, 7% 100%, 0 84%);
+      opacity: calc(0.42 + var(--panel-open, 0) * 0.58);
+      transform:
+        translate3d(calc((1 - var(--panel-open, 0)) * var(--panel-axis, 1) * 26px), calc(28px - var(--panel-open, 0) * 28px), 0)
+        scale(calc(0.95 + var(--panel-open, 0) * 0.05));
+      filter: brightness(calc(0.76 + var(--panel-open, 0) * 0.24));
+    }
+
+    .about-grid .panel:first-child {
+      clip-path: polygon(0 6%, 90% 0, 100% 14%, 100% 100%, 10% 100%, 0 88%);
+    }
+
+    .about-grid .panel:last-child {
+      clip-path: polygon(0 10%, 96% 0, 100% 12%, 100% 100%, 6% 100%, 0 82%);
+    }
+
+    .contact-grid .panel:first-child {
+      clip-path: polygon(0 8%, 92% 0, 100% 12%, 100% 100%, 9% 100%, 0 86%);
+    }
+
+    .contact-grid .panel:last-child {
+      clip-path: polygon(0 5%, 95% 0, 100% 18%, 100% 100%, 6% 100%, 0 82%);
+    }
+
+    .work-card {
+      min-height: 220px;
+      opacity: 1;
+      transform:
+        translate3d(
+          calc((1 - var(--card-open, 0)) * var(--card-axis, 1) * 54px),
+          calc(42px - var(--card-open, 0) * 42px),
+          0
+        )
+        scale(calc(0.9 + var(--card-open, 0) * 0.1));
+      clip-path: polygon(0 8%, 92% 0, 100% 18%, 100% 100%, 10% 100%, 0 86%);
+    }
+
+    .work-card::before {
+      opacity: calc(0.94 - var(--card-open, 0) * 0.54);
+      transform: scale(calc(1.03 - var(--card-open, 0) * 0.03));
+    }
+
+    .work-card::after {
+      opacity: calc(0.16 + var(--card-open, 0) * 0.32);
+    }
+
+    .work-card h3,
+    .work-card p {
+      opacity: 1;
+    }
+
+    .work-card:nth-child(1) {
+      --card-axis: -1;
+    }
+
+    .work-card:nth-child(2) {
+      --card-axis: 1;
+    }
+
+    .work-card:nth-child(3) {
+      --card-axis: -1;
+    }
+
+    .work-card:nth-child(4) {
+      --card-axis: 1;
+    }
+
+    .contact-link {
+      display: inline-block;
+      margin-top: 10px;
+      color: rgba(230, 238, 252, 0.82);
+      letter-spacing: 0.14em;
+    }
+
+    .is-observing-fault {
+      opacity: 0.78;
+      filter: blur(0.35px);
+      text-shadow: 0 0 10px rgba(164, 198, 246, 0.12);
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition:
+        opacity 0.9s ease,
+        transform 0.9s ease;
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px) {
+      .about-grid,
+      .contact-grid,
+      .works-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-wide {
+        grid-column: auto;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .site-header {
+        padding: 20px 18px;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .site-nav {
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+
+      .hero-title {
+        font-size: clamp(58px, 18vw, 104px);
+      }
+
+      .hero-copy h2 {
+        font-size: clamp(22px, 8vw, 38px);
+      }
+
+      main {
+        margin-top: -90vh;
+        padding-top: 90vh;
+      }
+
+      .section {
+        min-height: 112vh;
+        padding: 148px 22px 104px;
+      }
+
+      .section::before,
+      .section::after {
+        inset-inline: 12px;
+      }
+
+      .section-title {
+        font-size: clamp(42px, 13vw, 80px);
+      }
+
+      .panel,
+      .work-card {
+        padding: 22px;
+      }
+    }
+
+/* Readability revision: content stays editable in the HTML below. */
+:root { --text:#f1f5ff; --muted:#b8c7dd; --border:#34445e; }
+body {font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; font-size:16px;}
+.terrain-field {z-index:0;opacity:.35;}
+.site-header {padding:16px max(28px,calc((100vw - 1160px)/2));background:#080f1eee;border-bottom:1px solid #29384e;backdrop-filter:blur(16px);}
+.brand {font-size:15px;}
+.site-nav {gap:8px;font-size:13px;letter-spacing:.08em;color:#ced9eb;}
+.site-nav a {padding:12px 16px;border-radius:4px;}
+.site-nav a:hover,.site-nav a[aria-current] {background:#1b2e4b;color:white;}
+a:focus-visible,button:focus-visible,summary:focus-visible {outline:3px solid #99c7ff;outline-offset:5px;}
+.hero-stage {min-height:90vh;}
+.hero-sticky {position:relative;min-height:90vh;padding:150px 24px 88px;pointer-events:auto;}
+.hero-shell {gap:28px;}
+.hero-title,.section-title {font-family:"Hiragino Mincho ProN","Yu Mincho",serif;}
+.hero-title {font-size:clamp(72px,12vw,164px);opacity:1!important;filter:none!important;}
+.hero-title::before,.hero-title::after {display:none;}
+.hero-kicker,.hero-copy,.hero-guide {opacity:1!important;}
+.hero-kicker,.hero-guide,.section-label {color:#adc4e5;font-size:12px;letter-spacing:.18em;}
+.hero-copy h2 {font-size:28px;letter-spacing:.1em;}
+.hero-copy p {font-size:17px;color:#d4deee;}
+.hero-actions {display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.action {display:inline-flex;align-items:center;justify-content:center;gap:24px;min-height:48px;padding:14px 22px;border:1px solid #6e8aad;border-radius:4px;font-size:14px;font-weight:600;background:#111e33;color:#edf4ff;cursor:pointer;font-family:inherit;}
+.action.primary {background:#c1d8fa;color:#091528;border-color:#c1d8fa;}
+.action:hover {background:#264262;color:white;}
+.hero-guide {margin-top:12px;}
+main {margin:0;padding:0;}
+.section {min-height:0;padding:96px max(28px,calc((100vw - 1100px)/2));scroll-margin-top:76px;background:#091222ed;border-top:1px solid #28394f;}
+.section:nth-child(even) {background:#0c1729ed;}
+.section::before,.section::after {display:none;}
+.section-inner {gap:28px;transform:none!important;}
+.section-title {font-size:clamp(44px,5vw,72px);letter-spacing:0;line-height:1.15;}
+.section-copy {font-size:17px;line-height:1.9;color:#cbd7e8;max-width:720px;letter-spacing:.02em;}
+.panel,.work-card {padding:30px;background:#111e32;opacity:1!important;filter:none!important;transform:none!important;clip-path:none!important;border:1px solid #34445e;border-radius:6px;box-shadow:none;}
+.panel::before,.work-card::before {display:none;}
+.panel h3,.work-card h3 {font-size:21px;font-weight:600;letter-spacing:.02em;}
+.panel p,.work-card p {color:#cbd7e8;font-size:16px;line-height:1.9;letter-spacing:.01em;}
+.interest-item,.profile-item,.fragment-tag {color:#dce7f7;font-size:14px;letter-spacing:.02em;padding:8px 12px;border-color:#3b4c68;transform:none!important;}
+.fragment-stack {gap:18px;}
+.work-card {min-height:240px;}
+.work-card .meta-line {color:#9fb5d4;font-size:12px;letter-spacing:.12em;}
+.work-card.pending {background:#0c1728;border-style:dashed;}
+.work-card.pending h3 {color:#b4c3d9;}
+.pending-note {font-size:14px!important;color:#a8b9d1!important;}
+.section-next {display:flex;justify-content:space-between;align-items:center;gap:20px;padding-top:28px;border-top:1px solid #34445e;margin-top:12px;color:#b8c9e0;font-size:14px;}
+.reveal {opacity:1;transform:none;}
+.skip-link {position:fixed;top:-100px;left:20px;z-index:100;background:white;color:#07101c;padding:15px;}
+.skip-link:focus {top:12px;}
+.site-footer {position:relative;z-index:3;background:#080f1e;padding:32px max(28px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;color:#abbdd6;font-size:13px;}
+.work-details {border-top:1px solid #3b4c68;padding-top:20px;}
+.work-details summary {cursor:pointer;list-style:none;display:inline-flex;min-height:48px;align-items:center;gap:24px;color:#dbeaff;font-weight:600;}
+.work-details summary::after {content:'＋';}
+.work-details[open] summary::after {content:'−';}
+.work-details p {margin-top:12px;}
+@media(max-width:760px){.site-header{padding:12px 16px;gap:8px;align-items:center;}.site-nav{gap:0;font-size:11px;}.site-nav a{padding:10px 8px;letter-spacing:0;}.hero-sticky{padding:170px 20px 64px;}.hero-title{font-size:clamp(64px,19vw,120px);}.hero-copy h2{font-size:24px;}.hero-copy p{font-size:16px;}main{margin:0;padding:0;}.section{padding:64px 20px;scroll-margin-top:112px;}.section-title{font-size:42px;}.section-copy{font-size:16px;}.panel,.work-card{padding:24px;}.section-next{align-items:flex-start;flex-direction:column;}.site-footer{padding:28px 20px;}.action{gap:16px;}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}*,*::before,*::after{animation:none!important;transition:none!important;}}
+
+
+/* Black space: moving atmosphere, quiet areas behind readable content. */
+body {background:#030407;}
+.world {z-index:0;background:#030407;}
+.world::before,.world::after {display:none;}
+.terrain-field {display:none;}
+.space-atmosphere {position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#030407;}
+.space-haze {position:absolute;inset:-12%;background:radial-gradient(ellipse at 66% 35%,#2a345b45 0%,#131b3533 20%,transparent 47%),radial-gradient(ellipse at 22% 72%,#3c304222 0%,transparent 42%);animation:space-breathe 32s ease-in-out infinite alternate;will-change:transform;}
+.space-stars {position:absolute;inset:-60px;background-image:radial-gradient(circle at 35px 64px,#dbe5f0b3 0 .7px,transparent 1.4px),radial-gradient(circle at 147px 186px,#a3b6d577 0 .6px,transparent 1.3px),radial-gradient(circle at 263px 113px,#f0e6ef55 0 .7px,transparent 1.3px);background-size:347px 293px,431px 367px,557px 449px;opacity:.6;animation:space-drift 90s linear infinite alternate;will-change:transform;}
+.space-orbit {position:absolute;width:min(76vw,980px);aspect-ratio:1;top:8vh;left:45%;border:1px solid #7886a01c;border-radius:50%;transform:rotate(-24deg) scaleY(.55);mask-image:linear-gradient(100deg,transparent 15%,black 58%,transparent 85%);opacity:.6;}
+@keyframes space-breathe {from{transform:translate3d(-1%,1%,0) scale(.98);opacity:.6;}to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:1;}}
+@keyframes space-drift {from{transform:translate3d(-12px,8px,0);}to{transform:translate3d(28px,-22px,0);}}
+.site-header {background:#05070bef;border-color:#292c35;}
+.site-nav a:hover,.site-nav a[aria-current] {background:#20242d;}
+.hero-copy p {color:#e0e3ea;}
+.hero-kicker,.hero-guide,.section-label {color:#bdc2ce;}
+.action {background:#11151c;border-color:#626b7d;color:#edf0f6;}
+.action.primary {background:#d9e0ed;color:#090c13;border-color:#d9e0ed;}
+.action:hover {background:#303745;color:white;}
+.section,.section:nth-child(even) {background:linear-gradient(90deg,#05070bee,#070a11df 55%,#05070bee);border-color:#292d37;}
+.panel,.work-card {background:#0c1019f5;border-color:#353b49;}
+.work-card.pending {background:#090d14dd;}
+.section-copy,.panel p,.work-card p {color:#d4d8e2;}
+.interest-item,.profile-item,.fragment-tag {background:#11151f;border-color:#343d4d;color:#e0e4ee;}
+.section-next,.work-details {border-color:#343b48;}
+.site-footer {background:#05070b;color:#c0c6d2;}
+.fault-text.is-observing-fault {opacity:.78;filter:blur(.35px);text-shadow:0 0 10px #a4c6f61f;}
+body.atmosphere-paused .space-haze,body.atmosphere-paused .space-stars {animation-play-state:paused;}
+@media(max-width:760px){.space-stars{background-size:347px 293px,431px 367px,557px 449px;opacity:.45;}.space-orbit{width:125vw;left:18%;}.space-haze{animation-duration:40s;}}
+@media(prefers-reduced-motion:reduce){.space-haze,.space-stars{animation:none;}}
+
+
+/* Spacious reading rhythm */
+.hero-sticky {min-height:100svh;padding-top:160px;padding-bottom:110px;}
+.hero-shell {gap:36px;}
+.hero-copy {gap:24px;}
+.hero-actions {margin-top:16px;gap:20px;}
+.hero-guide {margin-top:28px;}
+.section {padding:160px max(48px,calc((100vw - 1040px)/2));}
+.section-inner {width:min(1040px,100%);gap:80px;}
+.section-heading {display:grid;gap:24px;max-width:740px;}
+.section-heading .section-label:first-child {margin-bottom:8px;}
+.section-heading .section-title {font-size:clamp(48px,5vw,76px);}
+.section-heading .section-copy {margin-top:24px;max-width:640px;line-height:2.15;}
+.about-grid {gap:40px;align-items:start;}
+.panel,.work-card {padding:40px;}
+.panel h3,.work-card h3 {margin-bottom:24px;}
+.profile-list,.interest-list {gap:14px;}
+.panel-wide {max-width:740px;margin-top:16px;}
+.panel p {max-width:58ch;line-height:2.1;}
+.works-grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;padding:0;perspective:none;align-items:start;}
+.works-grid::before {display:none;}
+.works-grid .work-card:first-child {grid-column:1/-1;width:min(780px,100%);margin-bottom:40px;padding:48px;}
+.fragment-stack {gap:24px;}
+.work-card p {max-width:58ch;line-height:2.1;}
+.work-card.pending {min-height:0;padding:28px;background:transparent;border-color:#292f3a;}
+.work-card.pending .fragment-stack {gap:14px;}
+.work-card.pending h3 {font-size:18px;margin-bottom:0;}
+.work-card.pending .pending-note {font-size:13px!important;}
+.work-details {margin-top:12px;padding-top:24px;}
+.section-next {margin-top:16px;padding-top:40px;}
+.contact-grid {grid-template-columns:minmax(0,740px);}
+.site-footer {padding-top:48px;padding-bottom:48px;}
+@media(max-width:900px){.about-grid{grid-template-columns:1fr;gap:32px;}.works-grid{grid-template-columns:1fr;}.works-grid .work-card:first-child{grid-column:auto;}.work-card.pending{max-width:780px;}}
+@media(max-width:760px){
+ .hero-sticky{padding:176px 24px 88px;min-height:100svh;}
+ .hero-shell{gap:32px;}.hero-copy{gap:20px;}.hero-actions{gap:14px;margin-top:12px;}.hero-guide{margin-top:24px;line-height:1.8;font-size:11px;letter-spacing:.1em;}
+ .section{padding:104px 28px;scroll-margin-top:136px;}.section-inner{gap:56px;}.section-heading{gap:18px;}.section-heading .section-title{font-size:40px;overflow-wrap:anywhere;}.section-heading .section-copy{margin-top:18px;line-height:2.1;font-size:16px;}
+ .panel,.work-card,.works-grid .work-card:first-child{padding:28px;}.panel-wide{margin-top:0;}.panel h3,.work-card h3{margin-bottom:20px;}.profile-list,.interest-list{gap:10px;}.interest-item,.profile-item{padding:8px 10px;font-size:13px;}
+ .works-grid{gap:24px;}.works-grid .work-card:first-child{margin-bottom:24px;}.fragment-stack{gap:22px;}.work-card.pending{padding:24px;}.section-next{padding-top:32px;margin-top:8px;gap:24px;}.section-next .action{width:100%;}.contact-grid{grid-template-columns:1fr;}.site-footer{padding:40px 28px;gap:24px;flex-wrap:wrap;}
+}
+
+
+/* Independently stacked About columns and visible blue atmosphere. */
+.about-grid {grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:36px;align-items:start;}
+.about-column {display:grid;gap:28px;align-content:start;min-width:0;}
+.about-column .panel-wide {margin:0;max-width:none;grid-column:auto;}
+.space-haze {background:radial-gradient(ellipse at 68% 28%,rgba(57,94,164,.38),rgba(24,47,94,.24) 28%,transparent 58%),radial-gradient(ellipse at 16% 74%,rgba(33,67,128,.3),transparent 52%),radial-gradient(ellipse at 80% 86%,rgba(65,47,92,.14),transparent 44%);animation:space-wander 38s ease-in-out infinite;}
+.space-stars {opacity:.72;}
+.space-orbit {border-color:#91b3ec35;opacity:.8;}
+.section,.section:nth-child(even) {background:linear-gradient(90deg,rgba(5,9,17,.72),rgba(7,14,27,.48) 55%,rgba(5,9,17,.72));}
+@keyframes space-wander {
+ 0%,100% {transform:translate3d(-1%,1%,0) scale(1);opacity:.82;}
+ 23% {transform:translate3d(2%,-1%,0) scale(1.035);opacity:1;}
+ 47% {transform:translate3d(.5%,2%,0) scale(1.015);opacity:.88;}
+ 51% {transform:translate3d(.8%,1.7%,0) scale(1.02);opacity:.96;}
+ 72% {transform:translate3d(-2%,-.5%,0) scale(1.045);opacity:.78;}
+ 88% {transform:translate3d(1%,.5%,0) scale(1.01);opacity:.93;}
+}
+@media(max-width:900px){.about-grid{grid-template-columns:1fr;gap:28px;}}
+@media(max-width:760px){.space-haze{animation-duration:46s;}.space-stars{opacity:.58;}}
+@media(prefers-reduced-motion:reduce){.space-haze{animation:none;}}
+
+
+/* Section navigation removed: reduce the trailing gap. */
+.section {padding-bottom:104px;}
+@media(max-width:760px){.section{padding-bottom:72px;}}
+
+/* Uneven boundaries: controlled irregularity with readable interiors. */
+.panel,.work-card {border-radius:5px 24px 8px 17px;}
+.about-column:first-child .panel:first-child {border-radius:19px 5px 23px 8px;transform:rotate(-.55deg)!important;}
+.about-column:first-child .panel:last-child {border-radius:4px 20px 7px 27px;transform:rotate(.45deg)!important;}
+.about-column:last-child .panel {border-radius:25px 6px 18px 4px;transform:rotate(.6deg)!important;}
+.works-grid .work-card:first-child {border-radius:7px 32px 5px 20px;transform:rotate(-.35deg)!important;}
+.work-card.pending:nth-child(2) {transform:rotate(.7deg)!important;border-radius:18px 4px 22px 6px;}
+.work-card.pending:nth-child(3) {transform:rotate(-.65deg)!important;border-radius:5px 21px 6px 15px;}
+.work-card.pending:nth-child(4) {transform:rotate(.4deg)!important;border-radius:20px 5px 17px 4px;}
+.panel::after,.work-card::after {height:1px;inset:auto 12% 12px 9%;background:linear-gradient(90deg,transparent,#9ab4e05c,transparent);transform:rotate(-1.2deg);opacity:.7;}
+.action {border-radius:4px 17px 6px 12px;transform:rotate(.7deg);transition:background .2s,transform .3s;}
+.action.primary {border-radius:17px 5px 14px 4px;transform:rotate(-.8deg);}
+.action:hover {transform:rotate(-.2deg) translateY(-2px);}
+.curved-arrow {width:27px;height:27px;flex:none;overflow:visible;}
+.section-title {position:relative;}
+.section-title::after {content:'';display:block;width:62px;height:12px;border-top:1px solid #96b7e76b;border-radius:50%;transform:rotate(-7deg);margin-top:22px;}
+.site-footer {border-top:1px solid #34405266;}
+.site-footer a {display:inline-flex;align-items:center;gap:15px;min-height:44px;}
+.space-orbit {animation:orbit-waver 49s ease-in-out infinite;}
+@keyframes orbit-waver {0%,100%{transform:rotate(-24deg) scaleY(.55) translateX(0);}36%{transform:rotate(-21deg) scaleY(.57) translateX(9px);}63%{transform:rotate(-26deg) scaleY(.53) translateX(-6px);}}
+body.atmosphere-paused .space-orbit {animation-play-state:paused;}
+@media(max-width:760px){.panel,.work-card{transform:rotate(-.25deg)!important;}.about-column:last-child .panel{transform:rotate(.3deg)!important;}.section-title::after{margin-top:18px;}}
+@media(prefers-reduced-motion:reduce){.space-orbit{animation:none;}}
+
+
+/* One continuous moving universe, shared by all sections. */
+.section,.section:nth-child(even) {background:transparent;border-top:none;}
+.site-footer {background:rgba(3,6,12,.55);}
+.space-atmosphere {background:radial-gradient(ellipse at 50% 40%,#081021,#020409 72%);}
+.space-haze {inset:-25%;background:radial-gradient(ellipse at 62% 32%,rgba(52,104,197,.55),rgba(24,63,133,.3) 22%,transparent 48%),radial-gradient(ellipse at 26% 67%,rgba(40,77,159,.38),transparent 43%),radial-gradient(ellipse at 78% 78%,rgba(88,51,125,.22),transparent 37%);animation:deep-space-drift 26s ease-in-out infinite;}
+.space-current {position:absolute;inset:-35%;background:conic-gradient(from 32deg at 58% 46%,transparent 0deg,rgba(46,94,180,.15) 42deg,transparent 82deg,transparent 160deg,rgba(80,133,222,.12) 206deg,transparent 248deg);animation:cosmic-current 76s linear infinite;will-change:transform;}
+.space-rift {position:absolute;left:45%;top:-20%;width:24%;height:140%;background:linear-gradient(90deg,transparent,rgba(85,133,221,.11) 42%,rgba(147,188,255,.15) 50%,rgba(55,86,158,.08) 58%,transparent);transform:rotate(28deg);animation:rift-drift 34s ease-in-out infinite;will-change:transform;}
+.space-stars {animation:space-drift 48s ease-in-out infinite alternate;opacity:.8;}
+.space-orbit {width:min(110vw,1500px);top:-18vh;left:12%;border-color:#9fc7ff52;opacity:.7;animation:orbit-waver 30s ease-in-out infinite;}
+@keyframes deep-space-drift {0%,100%{transform:translate3d(-4%,2%,0) rotate(-5deg) scale(1);opacity:.8;}27%{transform:translate3d(5%,-4%,0) rotate(4deg) scale(1.12);opacity:1;}48%{transform:translate3d(1%,3%,0) rotate(-2deg) scale(1.06);opacity:.83;}54%{transform:translate3d(2%,1%,0) rotate(0deg) scale(1.09);opacity:1;}78%{transform:translate3d(-5%,-2%,0) rotate(-6deg) scale(1.15);opacity:.92;}}
+@keyframes cosmic-current {from{transform:rotate(0deg) scale(1.04);}to{transform:rotate(360deg) scale(1.04);}}
+@keyframes rift-drift {0%,100%{transform:translate3d(-22%,0,0) rotate(28deg);opacity:.6;}38%{transform:translate3d(30%,5%,0) rotate(36deg);opacity:1;}65%{transform:translate3d(8%,-3%,0) rotate(22deg);opacity:.7;}}
+.section-heading {text-shadow:0 2px 18px #000,0 1px 3px #000;}
+.panel,.work-card {background:rgba(7,12,22,.93);}
+body.atmosphere-paused .space-current,body.atmosphere-paused .space-rift {animation-play-state:paused;}
+@media(max-width:760px){.space-current{animation-duration:96s;}.space-haze{animation-duration:34s;}.space-rift{width:45%;left:30%;opacity:.75;}.space-orbit{width:180vw;left:-30%;}.space-stars{opacity:.65;}}
+@media(prefers-reduced-motion:reduce){.space-current,.space-rift,.space-haze,.space-stars,.space-orbit{animation:none;}}
+
+
+/* A distant star in the lower left, and occasional fleeting meteors. */
+.corner-star {position:absolute;left:8vw;bottom:13vh;width:5px;height:5px;border-radius:50%;background:#e4efff;box-shadow:0 0 9px 2px #b3d4ff80,0 0 32px 9px #77a9ef26;animation:star-breath 8s ease-in-out infinite;}
+.corner-star::before,.corner-star::after {content:'';position:absolute;left:50%;top:50%;background:linear-gradient(90deg,transparent,#d2e4ff99,transparent);transform:translate(-50%,-50%) rotate(-12deg);}
+.corner-star::before {width:35px;height:1px;}
+.corner-star::after {width:1px;height:27px;background:linear-gradient(transparent,#d2e4ff88,transparent);}
+.shooting-star {position:absolute;left:52%;top:16%;width:130px;height:1px;background:linear-gradient(90deg,transparent,rgba(179,210,255,.3) 62%,#edf5ff);border-radius:50%;opacity:0;transform:rotate(145deg);transform-origin:right center;animation:meteor-flight 19s linear infinite;will-change:transform,opacity;}
+.shooting-star::after {content:'';position:absolute;right:-1px;top:-1px;width:3px;height:3px;border-radius:50%;background:#eff6ff;box-shadow:0 0 7px #b9d7ff;}
+.shooting-star-two {left:78%;top:36%;width:90px;animation-duration:31s;animation-delay:9s;}
+@keyframes star-breath {0%,100%{opacity:.45;transform:scale(.85);}46%{opacity:.9;transform:scale(1.12);}61%{opacity:.65;transform:scale(.98);}}
+@keyframes meteor-flight {0%,82%{opacity:0;transform:translate3d(0,0,0) rotate(145deg);}83%{opacity:.8;}87%{opacity:.55;}89%,100%{opacity:0;transform:translate3d(-42vw,30vh,0) rotate(145deg);}}
+body.atmosphere-paused .corner-star,body.atmosphere-paused .shooting-star {animation-play-state:paused;}
+@media(max-width:760px){.corner-star{left:8vw;bottom:9vh;width:4px;height:4px;}.shooting-star{width:85px;}.shooting-star-two{width:65px;}}
+@media(prefers-reduced-motion:reduce){.corner-star{animation:none;opacity:.65;}.shooting-star{animation:none;display:none;}}
+
+
+/* A large distant planet partly outside the lower-left viewport. */
+.corner-star {left:-90px;bottom:-130px;width:410px;height:410px;border-radius:50%;background:radial-gradient(circle at 73% 22%,rgba(110,158,207,.32),transparent 29%),radial-gradient(ellipse at 58% 35%,#26496b 0%,#152c48 35%,#0a1527 63%,#02050b 85%);box-shadow:inset -25px 22px 40px #000b,inset 5px -5px 28px #02040a,0 0 32px #6697d521;animation:planet-breathe 24s ease-in-out infinite;isolation:isolate;}
+.corner-star::before {inset:0;left:0;top:0;width:100%;height:100%;border-radius:50%;transform:none;background:repeating-linear-gradient(164deg,transparent 0 22px,#7599c00a 28px,#101e3538 34px,transparent 49px),radial-gradient(ellipse at 68% 38%,#99b6d419,transparent 35%);box-shadow:inset 2px 3px 5px #c1e4ff82,inset 7px 9px 15px #669dda38;opacity:.8;}
+.corner-star::after {inset:-1px;left:-1px;top:-1px;width:calc(100% + 2px);height:calc(100% + 2px);border-radius:50%;transform:none;background:radial-gradient(circle at 86% 12%,transparent 0%,#01040a08 26%,#01040a66 55%,#01040ae8 86%);}
+@keyframes planet-breathe {0%,100%{transform:translate3d(0,0,0);opacity:.9;}48%{transform:translate3d(5px,-7px,0);opacity:1;}72%{transform:translate3d(2px,-3px,0);opacity:.94;}}
+@media(max-width:760px){.corner-star{left:-100px;bottom:-105px;width:290px;height:290px;opacity:.75;}}
+@media(prefers-reduced-motion:reduce){.corner-star{animation:none;}}
+
+
+/* An indistinct, unreachable world rather than a clearly defined planet. */
+.corner-star {background:radial-gradient(ellipse at 69% 26%,#38537755,transparent 44%),radial-gradient(circle at 58% 38%,#152944 0%,#091321 52%,#02050b 84%);box-shadow:inset -28px -12px 65px #010309cc,0 0 55px #456a9420;filter:blur(9px);opacity:.24;animation:unknown-world 37s ease-in-out infinite;}
+.corner-star::before {background:radial-gradient(ellipse at 70% 27%,#8daac92b,transparent 48%);box-shadow:inset 2px 3px 16px #a9c7e526;opacity:.3;}
+.corner-star::after {background:radial-gradient(circle at 78% 20%,transparent 0%,#03070d44 43%,#03070de8 78%);}
+@keyframes unknown-world {0%,100%{transform:translate3d(0,0,0);opacity:.16;}34%{transform:translate3d(3px,-5px,0);opacity:.29;}57%{transform:translate3d(1px,-2px,0);opacity:.2;}82%{transform:translate3d(-2px,1px,0);opacity:.12;}}
+@media(max-width:760px){.corner-star{filter:blur(7px);opacity:.2;}}
+@media(prefers-reduced-motion:reduce){.corner-star{animation:none;opacity:.22;}}
+
+
+/* Fixed clockwise star motion around the lower-left unknown world. */
+.space-stars {left:calc(115px - 150vmax);top:calc(100% - 75px - 150vmax);right:auto;bottom:auto;width:300vmax;height:300vmax;transform-origin:50% 50%;animation:stars-clockwise 240s linear infinite;will-change:transform;}
+@keyframes stars-clockwise {from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.corner-star {animation:unknown-world-presence 37s ease-in-out infinite;transform:none;}
+@keyframes unknown-world-presence {0%,100%{opacity:.16;}34%{opacity:.29;}57%{opacity:.2;}82%{opacity:.12;}}
+.shooting-star {height:2px;width:110px;background:linear-gradient(90deg,transparent,rgba(176,204,241,.09) 40%,rgba(204,223,250,.35) 87%,transparent);filter:blur(1.6px);box-shadow:none;animation-name:fleeting-meteor;}
+.shooting-star::after {display:none;}
+.shooting-star-two {width:75px;filter:blur(1.8px);}
+@keyframes fleeting-meteor {0%,83%{opacity:0;transform:translate3d(0,0,0) rotate(145deg) scaleX(.6);}84%{opacity:.36;}86%{opacity:.21;}88%,100%{opacity:0;transform:translate3d(-35vw,25vh,0) rotate(145deg) scaleX(1.15);}}
+@media(max-width:760px){.space-stars{left:calc(45px - 150vmax);top:calc(100% - 40px - 150vmax);animation-duration:240s;}.shooting-star{width:75px;}.shooting-star-two{width:55px;}}
+@media(prefers-reduced-motion:reduce){.space-stars,.corner-star{animation:none;}.corner-star{opacity:.22;}}
+
+
+/* Obsidian-like space: deep black with restrained faceted reflections. */
+.space-atmosphere {background:radial-gradient(ellipse at 54% 42%,#070b13 0%,#020306 70%);}
+.space-haze {background:radial-gradient(ellipse at 68% 28%,rgba(49,78,123,.2),rgba(18,31,53,.1) 19%,transparent 42%),radial-gradient(ellipse at 22% 76%,rgba(32,48,78,.12),transparent 36%),radial-gradient(ellipse at 82% 73%,rgba(57,43,74,.07),transparent 31%);}
+.space-current {background:conic-gradient(from 32deg at 58% 46%,transparent 0deg,transparent 35deg,rgba(113,143,181,.09) 40deg,rgba(38,57,86,.035) 53deg,transparent 65deg,transparent 183deg,rgba(76,105,151,.07) 191deg,transparent 208deg);}
+.space-rift {width:17%;background:linear-gradient(90deg,transparent 0%,transparent 37%,rgba(72,102,144,.025) 45%,rgba(160,183,211,.13) 49.5%,rgba(91,120,160,.07) 52%,transparent 62%);}
+.space-orbit {border-color:#8da3bf25;opacity:.45;}
+.space-stars {opacity:.62;}
+@media(max-width:760px){.space-rift{width:30%;}.space-stars{opacity:.52;}}
+
+
+/* Approximate two parts black to one part blue in perceived atmosphere. */
+.space-atmosphere {background:radial-gradient(ellipse at 54% 42%,#0a1223 0%,#05080f 42%,#020306 78%);}
+.space-haze {background:radial-gradient(ellipse at 68% 28%,rgba(49,86,151,.34),rgba(21,43,79,.18) 23%,transparent 49%),radial-gradient(ellipse at 22% 76%,rgba(32,61,113,.23),transparent 42%),radial-gradient(ellipse at 82% 73%,rgba(57,43,74,.1),transparent 35%);}
+.space-current {background:conic-gradient(from 32deg at 58% 46%,transparent 0deg,transparent 35deg,rgba(113,151,208,.12) 40deg,rgba(38,65,110,.065) 53deg,transparent 65deg,transparent 183deg,rgba(76,119,185,.1) 191deg,transparent 208deg);}
+
+
+/* A quiet view through a window: depth at the edges, darkness for reading. */
+.window-shade {position:absolute;inset:-8% -5%;z-index:6;pointer-events:none;background:radial-gradient(ellipse 92% 63% at 50% 50%,transparent 49%,rgba(1,3,8,.16) 68%,rgba(1,3,8,.65) 92%);}
+.window-shade::before,.window-shade::after {content:'';position:absolute;left:7%;width:86%;height:24%;border-radius:50%;pointer-events:none;}
+.window-shade::before {top:0;border-bottom:1px solid rgba(114,143,177,.1);transform:rotate(-3deg);}
+.window-shade::after {bottom:0;border-top:1px solid rgba(101,126,160,.08);transform:rotate(2deg);}
+.near-light {position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(148,190,223,.22),rgba(91,145,198,.09) 33%,transparent 70%);filter:blur(6px);pointer-events:none;animation:near-light-fade 29s ease-in-out infinite;will-change:transform,opacity;}
+.near-light-one {left:3%;top:29%;}
+.near-light-two {right:4%;bottom:22%;width:95px;height:95px;animation-duration:41s;animation-delay:-17s;}
+@keyframes near-light-fade {0%,100%{opacity:.1;transform:translate3d(0,9px,0);}36%{opacity:.65;transform:translate3d(8px,-5px,0);}55%{opacity:.22;transform:translate3d(3px,0,0);}78%{opacity:.08;transform:translate3d(-5px,5px,0);}}
+.corner-star {background:radial-gradient(ellipse at 69% 26%,#38537755,transparent 44%),radial-gradient(circle at 58% 38%,#152944 0%,#091321 52%,#02050b 84%);}
+.corner-star::before {background:radial-gradient(ellipse at 70% 27%,#8daac92b,transparent 48%);box-shadow:inset 2px 3px 16px #a9c7e54d;opacity:.42;}
+.planet-glints {position:absolute;left:0;bottom:75px;width:330px;height:270px;background:radial-gradient(circle at 21% 9%,#c5e4ff 0 .7px,transparent 2px),radial-gradient(circle at 41% 13%,#aaceeb 0 .8px,transparent 2.5px),radial-gradient(circle at 59% 25%,#ccdef6 0 .6px,transparent 2px),radial-gradient(circle at 74% 43%,#8ab9e7 0 .7px,transparent 2px),radial-gradient(circle at 87% 65%,#b4d4f5 0 .6px,transparent 2px);filter:blur(.6px);opacity:.12;animation:distant-glints 17s ease-in-out infinite;pointer-events:none;}
+@keyframes distant-glints {0%,100%{opacity:.06;}31%{opacity:.12;}38%{opacity:.33;}44%{opacity:.09;}72%{opacity:.2;}78%{opacity:.07;}}
+body.atmosphere-paused .near-light,body.atmosphere-paused .planet-glints {animation-play-state:paused;}
+@media(max-width:760px){.planet-glints{left:-44px;bottom:40px;width:235px;height:190px;}.near-light{width:45px;height:45px;}.near-light-two{width:65px;height:65px;}.window-shade{inset:-8% -18%;}.window-shade::before,.window-shade::after{border-color:rgba(101,126,160,.05);}}
+@media(prefers-reduced-motion:reduce){.near-light,.planet-glints{animation:none;opacity:.12;}}
+
+
+/* Remove the sweeping light streak and reveal the lower-left world. */
+.space-rift,.space-current {display:none;}
+.corner-star {filter:blur(6px);background:radial-gradient(ellipse at 69% 26%,#41668b66,transparent 44%),radial-gradient(circle at 58% 38%,#213d5b 0%,#101f34 52%,#03070e 84%);animation:unknown-world-visible 37s ease-in-out infinite;opacity:.44;}
+.corner-star::before {box-shadow:inset 2px 3px 17px #a9c7e55e;opacity:.5;}
+@keyframes unknown-world-visible {0%,100%{opacity:.36;}34%{opacity:.53;}57%{opacity:.43;}82%{opacity:.31;}}
+@media(max-width:760px){.corner-star{filter:blur(5px);}}
+@media(prefers-reduced-motion:reduce){.corner-star{animation:none;opacity:.44;}}
+
+
+/* Larger planet, with star rotation centered on its new position. */
+.corner-star {width:550px;height:550px;left:-120px;bottom:-165px;}
+.space-stars {left:calc(155px - 150vmax);top:calc(100% - 110px - 150vmax);}
+.planet-glints {width:440px;height:360px;left:0;bottom:110px;}
+@media(max-width:760px){.corner-star{width:350px;height:350px;left:-125px;bottom:-130px;}.space-stars{left:calc(50px - 150vmax);top:calc(100% - 45px - 150vmax);}.planet-glints{left:-44px;bottom:45px;width:285px;height:235px;}}
+
+
+/* Detailed reference-based background, continuous across the site. */
+.space-atmosphere {background:#030710;}
+.traced-universe {position:absolute;inset:0;background-image:url('assets/universe-original.png');background-size:cover;background-position:center center;opacity:.69;}
+.reading-shade {position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(2,5,12,.65) 0%,rgba(2,5,12,.38) 37%,rgba(2,5,12,.08) 76%),linear-gradient(180deg,rgba(2,5,12,.27),transparent 55%,rgba(2,5,12,.16));}
+.window-shade,.near-light,.planet-glints,.corner-star,.space-haze,.space-current,.space-rift,.space-orbit {display:none;}
+.space-stars {opacity:.16;}
+.hero-title {text-shadow:0 4px 28px #02050cbf;}
+.hero-copy,.hero-kicker,.hero-guide {text-shadow:0 2px 14px #000;}
+.panel,.work-card {background:rgba(5,10,20,.94);}
+@media(max-width:760px){.traced-universe{background-position:36% center;opacity:.6;}.reading-shade{background:radial-gradient(ellipse at 50% 42%,rgba(2,5,12,.67),rgba(2,5,12,.31) 65%,rgba(2,5,12,.12));}.space-stars{opacity:.14;}}
+
+
+/* Original world: preserve delicate rim light without darkening it away. */
+.traced-universe {opacity:.94;}
+.reading-shade {background:radial-gradient(ellipse at 50% 40%,rgba(2,5,12,.13),transparent 65%);}
+@media(max-width:760px){.traced-universe{opacity:.92;background-position:38% center;}.reading-shade{background:rgba(2,5,12,.06);}}
+
+/* Keep unpublished contact content out of layout and accessibility navigation. */
+[hidden] {display:none!important;}
+.works-grid .work-card.pending {grid-column:1/-1;width:min(780px,100%);min-height:0;transform:none!important;}
+
+/* Clear information hierarchy for the submitted mobile design. */
+.section-heading .section-title {font-size:clamp(32px,4.3vw,60px);line-height:1.45;letter-spacing:.03em;overflow-wrap:normal;}
+.section-heading {gap:18px;}
+.section-heading .section-copy {margin-top:10px;font-size:16px;line-height:1.95;}
+.hero-copy h2 {font-size:25px;line-height:1.6;letter-spacing:.1em;}
+.hero-copy p {font-size:15px;color:#c4cddd;}
+.panel h3 {font-size:20px;line-height:1.5;letter-spacing:.03em;}
+.panel .perspective-lead {font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:clamp(22px,2vw,27px);line-height:1.8;color:#f1f4fb;letter-spacing:.04em;margin-bottom:22px;}
+.panel p {font-size:15px;line-height:1.95;}
+.profile-list,.interest-list,.fragment-tags {gap:10px 18px;}
+.interest-item,.profile-item,.fragment-tag {display:inline;padding:0;border:0;background:transparent;box-shadow:none;border-radius:0;transform:none!important;color:#ced7e7;letter-spacing:.03em;line-height:1.9;font-size:15px;}
+.profile-item:not(:last-child)::after {content:'/';color:#66768d;margin-left:18px;}
+.interest-item {padding-left:12px;position:relative;}
+.interest-item::before {content:'';position:absolute;left:0;top:.8em;width:3px;height:3px;border-radius:50%;background:#7e92af;}
+.fragment-tag {font-size:12px;color:#a8b9d1;letter-spacing:.08em;}
+.work-card .meta-line,.section-label {font-size:11px;color:#9eacc1;letter-spacing:.15em;}
+.work-card h3 {font-size:28px;line-height:1.35;}
+.work-card p:not(.meta-line):not(.fragment-status):not(.pending-note) {font-size:15px;line-height:1.95;}
+@media(max-width:760px){.section-heading .section-title{font-size:29px;line-height:1.5;}.section-heading .section-copy{font-size:15px;}.hero-copy h2{font-size:21px;}.hero-copy p{font-size:14px;}.panel h3{font-size:19px;}.panel .perspective-lead{font-size:22px;}.section-inner{gap:44px;}.section-heading .section-title::after{margin-top:16px;}}
+
+
+/* English display titles, explicit reading surfaces, concise project notes. */
+.site-nav {font-size:12px;letter-spacing:.12em;gap:8px;}
+.site-nav a {display:inline-flex;align-items:center;min-height:44px;padding:10px 14px;}
+.section-heading {padding:30px 32px;background:rgba(3,7,14,.95);border-left:1px solid #5a6c8859;max-width:780px;border-radius:3px 17px 5px 7px;gap:14px;text-shadow:none;}
+.section-heading .section-title {font-size:clamp(44px,5.4vw,76px);line-height:1.08;letter-spacing:-.025em;}
+.section-heading .section-title::after {display:none;}
+.section-subtitle {font-size:14px;color:#c2cfe2;letter-spacing:.08em;line-height:1.7;}
+.section-heading .section-copy {margin-top:12px;color:#d2d9e5;line-height:1.95;}
+.panel,.work-card {background:#070c16;border-color:#354052;}
+.works-grid .work-card.pending {background:#070c16;border-color:#2c3647;}
+.hero-shell {isolation:isolate;}
+.hero-shell::before {content:'';position:absolute;inset:-28px -12px;background:radial-gradient(ellipse at center,rgba(2,5,12,.9),rgba(2,5,12,.7) 55%,transparent 76%);z-index:-1;pointer-events:none;}
+.design-notes {border-top:1px solid #344052;margin-top:10px;padding-top:24px;}
+.design-notes h4 {font-size:11px;line-height:1.6;letter-spacing:.16em;color:#a8b9d0;font-weight:500;margin-bottom:20px;}
+.design-notes dl {display:grid;gap:20px;}
+.design-notes dl>div {display:grid;gap:7px;}
+.design-notes dt {font-size:15px;font-weight:600;line-height:1.6;color:#edf2fa;}
+.design-notes dd {font-size:14px;line-height:1.9;color:#bdc9db;margin:0;}
+@media(max-width:760px){.site-nav{font-size:12px;gap:3px;}.site-nav a{padding:10px 12px;}.section-heading{padding:26px 20px;}.section-heading .section-title{font-size:38px;letter-spacing:-.04em;}.section-subtitle{font-size:13px;}.section-heading .section-copy{font-size:15px;margin-top:10px;}.design-notes dl{gap:18px;}}
+
+
+/* Editorial About: identity, interests and the author's own words have different roles. */
+.about-editorial {display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:48px 64px;background:#050a13;padding:48px;border-left:1px solid #52658155;}
+.identity-block,.interests-block {min-width:0;}
+.identity-name {font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:clamp(34px,3.6vw,48px);font-weight:400;line-height:1.5;letter-spacing:.08em;margin:16px 0;}
+.identity-meta {font-size:14px;color:#aebed3;letter-spacing:.08em;margin-bottom:28px;}
+.identity-story {font-size:15px;color:#d2dbe9;line-height:2;max-width:35em;}
+.interests-block h3 {font-size:12px;font-weight:500;letter-spacing:.14em;color:#aebed3;line-height:1.8;}
+.interests-block h3 span {display:block;font-size:13px;letter-spacing:.04em;color:#d3dfed;margin-top:8px;}
+.editorial-interests {list-style:none;display:flex;flex-wrap:wrap;gap:14px 22px;margin-top:28px;padding:0;}
+.editorial-interests li {font-size:15px;line-height:1.8;color:#e0e7f1;}
+.personal-words {grid-column:1/-1;border-top:1px solid #354154;padding-top:44px;display:grid;grid-template-columns:1fr 2fr;gap:28px;align-items:start;}
+.own-words {font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:clamp(27px,3vw,40px);line-height:1.9;letter-spacing:.1em;color:#edf2fa;}
+.next-record {grid-column:1/-1;width:min(780px,100%);display:flex;gap:20px;justify-content:space-between;flex-wrap:wrap;align-items:center;padding:22px 0;border-top:1px solid #354154;color:#c3cfe0;font-size:13px;line-height:1.8;background:#050a13;}
+.next-record span:first-child {font-size:11px;letter-spacing:.15em;color:#9db0c9;}
+.works-grid .work-card:first-child {margin-bottom:4px;}
+.site-footer {background:#03070e;align-items:center;gap:28px;}
+.footer-signature {display:grid;gap:9px;}.footer-signature>span {font-size:16px;color:#e0e8f5;letter-spacing:.1em;}.footer-signature small {font-size:10px;letter-spacing:.16em;color:#91a3bd;}
+@media(max-width:760px){.about-editorial{grid-template-columns:1fr;padding:30px 24px;gap:40px;}.identity-name{font-size:34px;margin:14px 0;}.identity-story{font-size:15px;line-height:2;}.identity-story br{display:none;}.identity-meta{margin-bottom:24px;}.interests-block{border-top:1px solid #354154;padding-top:28px;}.editorial-interests{margin-top:22px;gap:12px 20px;}.personal-words{grid-template-columns:1fr;padding-top:30px;gap:20px;}.own-words{font-size:28px;line-height:1.85;}.next-record{gap:10px;padding:22px 12px;}.site-footer{padding:36px 28px;}}
+
+
+/* Restore the established two-column About grouping and shared alignment. */
+.about-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;align-items:start;}
+.about-column {display:grid;gap:28px;align-content:start;min-width:0;}
+.about-grid .panel {padding:32px;transform:none!important;border-radius:6px 18px 6px 12px;background:#070c16;}
+.about-grid .panel h3 {margin:0 0 22px;font-size:22px;line-height:1.5;}
+.about-grid .panel .section-label {margin-bottom:12px;}
+.about-grid .panel .name-origin {margin-top:24px;font-size:15px;line-height:1.95;color:#c5d0e1;}
+.about-grid .panel .perspective-lead {font-size:24px;line-height:1.9;margin:0;}
+.restored-interests {list-style:none;display:flex;flex-wrap:wrap;gap:12px 22px;margin:0;padding:0;}
+.restored-interests li {color:#d5deed;font-size:15px;line-height:1.9;}
+@media(max-width:900px){.about-grid{grid-template-columns:1fr;gap:28px;}}
+@media(max-width:760px){.about-grid .panel{padding:26px;}.about-grid .panel h3{font-size:21px;}.about-grid .panel .perspective-lead{font-size:22px;}.restored-interests{gap:12px 20px;}}
+
+
+/* One shared reading axis; the universe remains faintly visible through surfaces. */
+.section-inner {width:min(780px,100%);margin-inline:auto;}
+.about-grid {grid-template-columns:minmax(0,1fr);gap:28px;}
+.about-column {gap:28px;}
+.about-grid .panel,.panel,.work-card,.works-grid .work-card.pending {background:rgba(5,10,19,.92);}
+.about-grid .panel {padding:32px;}
+.section-heading {width:100%;max-width:none;background:rgba(3,7,14,.91);}
+.works-grid .work-card:first-child,.next-record {width:100%;}
+.next-record {background:rgba(5,10,19,.92);}
+@media(max-width:760px){.about-grid .panel{padding:26px;}.section-heading{background:rgba(3,7,14,.94);}.about-grid .panel,.panel,.work-card,.next-record{background:rgba(5,10,19,.94);}}
+
+
+/* A translucent section shell groups the heading and its content. */
+.section-inner {padding:38px;background:rgba(5,10,19,.48);border:1px solid rgba(131,157,195,.19);border-radius:7px 25px 9px 18px;gap:36px;}
+.section-heading {background:transparent!important;border:0;border-radius:0;padding:0;max-width:none;}
+.section-heading .section-copy {max-width:600px;}
+.about-grid .panel,.work-card {width:100%;}
+.works-grid .work-card:first-child {padding:32px;}
+.next-record {padding:20px 16px;}
+@media(max-width:760px){.section{padding-inline:18px;}.section-inner{padding:24px 16px;background:rgba(5,10,19,.48);border-radius:5px 20px 7px 13px;gap:30px;}.section-heading .section-title{font-size:clamp(29px,8.5vw,38px);letter-spacing:-.045em;}.about-grid .panel,.works-grid .work-card:first-child{padding:22px 18px;}.about-grid,.about-column{gap:22px;}.about-grid .panel h3{font-size:20px;}.about-grid .panel .perspective-lead{font-size:21px;}.restored-interests{gap:10px 17px;}.hero-sticky{padding-inline:24px;}}
+
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#fragments">制作一覧へスキップ</a>
+  <div class="space-atmosphere" aria-hidden="true"><div class="traced-universe"></div><div class="reading-shade"></div><div class="window-shade"></div><div class="near-light near-light-one"></div><div class="near-light near-light-two"></div><div class="planet-glints"></div><div class="corner-star"></div><div class="shooting-star shooting-star-one"></div><div class="shooting-star shooting-star-two"></div><div class="space-current"></div><div class="space-rift"></div><div class="space-haze"></div><div class="space-stars"></div><div class="space-orbit"></div></div>
+
+  <div class="terrain-field" aria-hidden="true">
+    <div class="terrain-drift">
+      <canvas id="terrainCanvas"></canvas>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="#home">IJIGEN</a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="#home">HOME</a>
+      <a href="#about">ABOUT</a>
+      <a href="#fragments">FRAGMENTS</a>
+    </nav>
+  </header>
+
+  <section class="hero-stage" id="home" aria-label="Home">
+    <div class="hero-sticky">
+      <div class="hero-shell">
+        <p class="hero-kicker">PERSONAL LOG</p>
+        <h1 class="hero-title" id="heroTitle" data-text="異次元">異次元</h1>
+        <div class="hero-copy">
+          <h2>思考と制作の記録</h2>
+          <p>
+            異次元のAの、個人ポートフォリオ。
+          </p>
+        </div>
+        <div class="hero-actions"><a class="action primary" href="#fragments">制作を見る <svg class="curved-arrow" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 25L25 7M14 7H25V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a class="action" href="#about">自分について <svg class="curved-arrow" style="transform:rotate(135deg)" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 25L25 7M14 7H25V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+<p class="hero-guide">下へスクロールして、この記録をたどる ↓</p>
+      </div>
+    </div>
+  </section>
+
+  <main>
+    <section class="section reveal" id="about" data-axis="-1">
+      <div class="section-inner">
+        <div class="section-heading">
+        <p class="section-label">01</p>
+        <h2 class="section-title">ABOUT</h2><p class="section-subtitle">自分について</p>
+        </div>
+        <div class="about-grid">
+          <div class="about-column">
+            <article class="panel">
+              <p class="section-label">PROFILE</p>
+              <h3>異次元のA</h3>
+              <div class="profile-list"><span class="profile-item">18歳</span><span class="profile-item">高専生</span></div>
+              <p class="name-origin">初めてゲームをするときに思いついた「異次元」。昔から使っている名前です。</p>
+            </article>
+            <article class="panel">
+              <h3>好きな感覚</h3>
+              <p class="perspective-lead">一瞬、届かないもの、消えそう。</p>
+            </article>
+          </div>
+          <div class="about-column">
+            <article class="panel">
+              <h3>興味のあること</h3>
+              <ul class="restored-interests"><li>数学</li><li>宇宙</li><li>旅行</li><li>ボカロ</li><li>確率</li><li>雨</li><li>雪</li><li>黒</li><li>彼岸花</li></ul>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal" id="fragments" data-axis="1">
+      <div class="section-inner">
+        <div class="section-heading">
+        <p class="section-label">02</p>
+        <h2 class="section-title">FRAGMENTS</h2><p class="section-subtitle">制作と思考の記録</p>
+        <p class="section-copy">
+          制作や実験、考えたことを、途中の過程も含めて記録しています。
+        </p>
+        </div>
+        <div class="skill-work-layout">
+          <div class="works-grid">
+            <article class="work-card">
+              <div class="fragment-stack">
+                <p class="meta-line">Fragment 01</p>
+                <h3>izigen_A</h3>
+                <p>
+                  自分が世界を見る窓をテーマにした、個人ポートフォリオ。
+                </p>
+                <div class="fragment-tags">
+                  <span class="fragment-tag">HTML</span>
+                  <span class="fragment-tag">CSS</span>
+                  <span class="fragment-tag">JavaScript</span>
+                </div>
+                <p class="fragment-status">制作中 / In Progress</p><div class="design-notes"><h4>DESIGN NOTES</h4><dl><div><dt>届かない</dt><dd>巨大な天体と、奥へ続く暗い空間。</dd></div><div><dt>儚さ</dt><dd>黒と青の中に、淡い光を残す。</dd></div><div><dt>不確定</dt><dd>輪郭や傾きを、少しずつ不揃いに。</dd></div></dl></div>
+              </div>
+            </article>
+            <p class="next-record"><span>COMING SOON</span><span>次の記録は準備中です。</span></p>
+          </div>
+        </div>
+</div>
+    </section>
+
+    <section class="section reveal" id="contact" data-axis="-1" hidden>
+      <div class="section-inner">
+        <div class="section-heading">
+        <p class="section-label">03 / CONTACT</p>
+        <h2 class="section-title">CONTACT</h2><p class="section-label">連絡先</p>
+        <p class="section-copy">
+          連絡先は準備中です。
+        </p>
+        </div>
+        <div class="contact-grid">
+          <article class="panel" style="--panel-axis:-1;">
+            <h3>Mail</h3>
+            <p class="contact-link"></p>
+          </article>
+        </div>
+</div>
+    </section>
+  </main>
+<footer class="site-footer"><div class="footer-signature"><span>異次元のA</span><small>PERSONAL LOG</small></div><a href="#home">トップへ<svg class="curved-arrow" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 25L25 7M14 7H25V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></footer>
+
+  <script>
+    const terrainCanvas = document.getElementById("terrainCanvas");
+    const terrainCtx = terrainCanvas.getContext("2d", { alpha: true, desynchronized: true });
+    const heroStage = document.querySelector(".hero-stage");
+    const heroTitle = document.getElementById("heroTitle");
+    const revealItems = [...document.querySelectorAll(".reveal")];
+    const sections = [...document.querySelectorAll(".section")];
+    const panels = [...document.querySelectorAll(".panel")];
+    const workCards = [...document.querySelectorAll(".work-card")];
+    // Wrap individual text nodes so faults never remove links or nested controls.
+    const textTargets = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const readableNodes = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.textContent.trim() && !node.parentElement.closest('script,style,[aria-hidden="true"]')) readableNodes.push(node);
+    }
+    readableNodes.forEach(node => {
+      const span = document.createElement('span');
+      span.className = 'fault-text';
+      span.textContent = node.textContent;
+      node.replaceWith(span);
+      textTargets.push(span);
+    });
+
+    const terrainState = {
+      cell: 18,
+      cols: 0,
+      rows: 0,
+      width: 0,
+      height: 0,
+      singularityStatic: document.createElement("canvas"),
+      singularityDynamic: [],
+      terrainStatic: document.createElement("canvas"),
+      terrainDynamic: [],
+      terrainAccent: [],
+      currentRift: 0,
+      targetRift: 0,
+      frameId: 0,
+      faultTimer: 0,
+      anomalyTimer: 0,
+      anomalyReleaseTimer: 0,
+      anomaly: {
+        x: 0,
+        y: 0,
+        pulse: 0,
+        shear: 0,
+        split: 0,
+        targetX: 0,
+        targetY: 0,
+        targetPulse: 0,
+        targetShear: 0,
+        targetSplit: 0
+      }
+    };
+
+    const toneMap = {
+      0: "#050910",
+      1: "#08101b",
+      2: "#0b1630",
+      3: "#122243",
+      4: "#183162",
+      5: "#22487c"
+    };
+
+    const shiftedToneMap = {
+      0: "#03060c",
+      1: "#060d18",
+      2: "#091223",
+      3: "#0f1b34",
+      4: "#132347",
+      5: "#183460"
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function smoothStep(edge0, edge1, x) {
+      const t = clamp((x - edge0) / Math.max(edge1 - edge0, 0.0001), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function mix(from, to, amount) {
+      return from + (to - from) * amount;
+    }
+
+    function fillTile(ctx, x, y, size, tone, accent, alpha = 1) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = tone;
+      ctx.fillRect(x, y, size, size);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+      ctx.fillRect(x, y, size, 1);
+      ctx.fillRect(x, y, 1, size);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+      ctx.fillRect(x, y + size - 1, size, 1);
+      ctx.fillRect(x + size - 1, y, 1, size);
+
+      ctx.strokeStyle = accent ? "rgba(108, 32, 48, 0.32)" : "rgba(168, 194, 236, 0.05)";
+      ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+      ctx.restore();
+    }
+
+    function buildTerrainHeightMap(cols, rows) {
+      const brushes = [
+        { x: 0.16, y: 0.22, rx: 0.24, ry: 0.18, weight: 1.18 },
+        { x: 0.38, y: 0.26, rx: 0.22, ry: 0.16, weight: 1.08 },
+        { x: 0.68, y: 0.22, rx: 0.26, ry: 0.18, weight: 1.2 },
+        { x: 0.84, y: 0.36, rx: 0.18, ry: 0.18, weight: 0.92 },
+        { x: 0.24, y: 0.52, rx: 0.22, ry: 0.18, weight: 1.02 },
+        { x: 0.52, y: 0.56, rx: 0.32, ry: 0.24, weight: 1.28 },
+        { x: 0.78, y: 0.64, rx: 0.24, ry: 0.22, weight: 1.04 },
+        { x: 0.36, y: 0.78, rx: 0.24, ry: 0.18, weight: 0.94 },
+        { x: 0.68, y: 0.82, rx: 0.28, ry: 0.18, weight: 0.9 }
+      ];
+
+      const map = Array.from({ length: rows }, () => Array(cols).fill(1));
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const nx = col / Math.max(cols - 1, 1);
+          const ny = row / Math.max(rows - 1, 1);
+          let value = 0;
+
+          brushes.forEach((brush) => {
+            const dx = (nx - brush.x) / brush.rx;
+            const dy = (ny - brush.y) / brush.ry;
+            const distance = dx * dx + dy * dy;
+            value += Math.max(0, 1 - distance) * brush.weight;
+          });
+
+          value += Math.max(0, 0.14 - Math.abs(ny - (0.34 + Math.sin(nx * 7.8) * 0.05))) * 3;
+          value += Math.max(0, 0.11 - Math.abs(ny - (0.66 + Math.cos(nx * 6.2) * 0.04))) * 2.3;
+          value += Math.max(0, 0.08 - Math.abs(nx - (0.5 + Math.sin(ny * 8.4) * 0.05))) * 1.8;
+
+          const thresholds = [0.2, 0.54, 0.92, 1.28, 1.68];
+          let level = 0;
+          thresholds.forEach((threshold, index) => {
+            if (value > threshold) {
+              level = index + 1;
+            }
+          });
+
+          map[row][col] = level;
+        }
+      }
+
+      return map;
+    }
+
+    function buildSingularityMap(cols, rows) {
+      const map = [];
+      const centerX = cols * 0.5;
+      const centerY = rows * 0.42;
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const dx = (col - centerX) / cols;
+          const dy = (row - centerY) / rows;
+          const dist = Math.hypot(dx * 1.1, dy * 1.34);
+          const ringA = Math.max(0, 1 - Math.abs(dist - 0.082) / 0.03);
+          const ringB = Math.max(0, 1 - Math.abs(dist - 0.164) / 0.044);
+          const field = Math.max(0, 1 - dist / 0.52);
+          const shear = Math.max(0, 1 - Math.abs(dy * 1.1 + dx * 0.22) / 0.08);
+          const noise =
+            (Math.sin(col * 0.36) + Math.cos(row * 0.34) + Math.sin((col - row) * 0.14)) * 0.035;
+          const mass = field * 1.08 + ringA * 2.24 + ringB * 1.06 + shear * 0.48 + noise;
+
+          let level = 0;
+          if (dist > 0.34) level = 1;
+          if (mass > 0.38) level = 2;
+          if (mass > 0.74) level = 3;
+          if (mass > 1.06) level = 4;
+          if (mass > 1.44) level = 5;
+          if (dist < 0.05) level = 0;
+
+          const movable =
+            ringA > 0.18 ||
+            ringB > 0.22 ||
+            (field > 0.22 && shear > 0.22 && Math.abs(Math.sin(col * 0.24 + row * 0.18)) > 0.94);
+
+          const angle = Math.atan2(dy, dx);
+          const tangential = angle + (((col + row) % 2 === 0) ? Math.PI / 2 : -Math.PI / 2);
+          const driftScale = 3 + field * 7 + ringA * 7;
+          const shiftX = Math.cos(tangential) * driftScale + Math.cos(angle) * (ringA * 3.2);
+          const shiftY = Math.sin(tangential) * driftScale + Math.sin(angle) * (ringA * 3.2);
+          const accent = (ringA > 0.74 || ringB > 0.82) && (row * 13 + col * 7) % 57 === 0;
+          const delay = clamp((0.22 - dist) * 1.16 + ((row + col) % 6) * 0.035, 0, 0.58);
+
+          map.push({
+            row,
+            col,
+            level,
+            tone: accent ? "#18090d" : toneMap[level],
+            toneShift: accent ? "#220b10" : shiftedToneMap[Math.max(0, level - 1)],
+            movable,
+            accent,
+            shiftX,
+            shiftY,
+            delay,
+            dist
+          });
+        }
+      }
+
+      return map;
+    }
+
+    function buildTerrain() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const cell = window.innerWidth < 760 ? 13 : 15;
+      const cols = Math.ceil(window.innerWidth / cell) + 10;
+      const rows = Math.ceil(window.innerHeight / cell) + 10;
+      const width = cols * cell;
+      const height = rows * cell;
+
+      terrainState.cell = cell;
+      terrainState.cols = cols;
+      terrainState.rows = rows;
+      terrainState.width = width;
+      terrainState.height = height;
+      terrainState.singularityDynamic = [];
+      terrainState.terrainDynamic = [];
+      terrainState.terrainAccent = [];
+
+      terrainCanvas.width = Math.ceil(width * dpr);
+      terrainCanvas.height = Math.ceil(height * dpr);
+      terrainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      terrainState.singularityStatic.width = Math.ceil(width * dpr);
+      terrainState.singularityStatic.height = Math.ceil(height * dpr);
+      terrainState.terrainStatic.width = Math.ceil(width * dpr);
+      terrainState.terrainStatic.height = Math.ceil(height * dpr);
+
+      const singularityCtx = terrainState.singularityStatic.getContext("2d", { alpha: true, desynchronized: true });
+      const terrainStaticCtx = terrainState.terrainStatic.getContext("2d", { alpha: true, desynchronized: true });
+      singularityCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      terrainStaticCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      singularityCtx.clearRect(0, 0, width, height);
+      terrainStaticCtx.clearRect(0, 0, width, height);
+
+      const singularityMap = buildSingularityMap(cols, rows);
+      const terrainMap = buildTerrainHeightMap(cols, rows);
+
+      singularityMap.forEach((tile) => {
+        const x = tile.col * cell;
+        const y = tile.row * cell;
+
+        if (tile.movable) {
+          terrainState.singularityDynamic.push({ ...tile, x, y, size: cell });
+        } else {
+          fillTile(singularityCtx, x, y, cell, tile.tone, tile.accent);
+        }
+      });
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const level = terrainMap[row][col];
+          const x = col * cell;
+          const y = row * cell;
+          const boundary =
+            col === 0 ||
+            row === 0 ||
+            col === cols - 1 ||
+            row === rows - 1 ||
+            terrainMap[row][Math.max(col - 1, 0)] !== level ||
+            terrainMap[row][Math.min(col + 1, cols - 1)] !== level ||
+            terrainMap[Math.max(row - 1, 0)][col] !== level ||
+            terrainMap[Math.min(row + 1, rows - 1)][col] !== level;
+
+          const nx = col / Math.max(cols - 1, 1);
+          const ny = row / Math.max(rows - 1, 1);
+          const seamA = Math.abs(ny - (0.34 + Math.sin(nx * 7.8) * 0.05));
+          const seamB = Math.abs(ny - (0.66 + Math.cos(nx * 6.2) * 0.04));
+          const seamC = Math.abs(nx - (0.5 + Math.sin(ny * 8.4) * 0.05));
+          const seam = Math.min(seamA, seamB, seamC);
+          const accent = boundary && ((row * 11 + col * 7) % 41 === 0);
+          const movable = boundary && seam < 0.044;
+          const depth = clamp(level / 5, 0.24, 1);
+          const dirSeedX = Math.sin(col * 0.73 + row * 0.28);
+          const dirSeedY = Math.cos(col * 0.41 - row * 0.62);
+
+          const tile = {
+            x,
+            y,
+            size: cell,
+            tone: accent ? toneMap[Math.max(1, level - 1)] : toneMap[level],
+            toneShift: accent ? "#19080d" : shiftedToneMap[level],
+            accent,
+            shiftX: (Math.sign(dirSeedX) || 1) * (3 + depth * 9),
+            shiftY: (Math.sign(dirSeedY) || -1) * (2 + depth * 6.4),
+            delay: clamp((0.044 - seam) * 8.2 + (row % 3) * 0.04 + (col % 4) * 0.02, 0, 0.5)
+          };
+
+          if (movable) {
+            terrainState.terrainDynamic.push(tile);
+          } else {
+            fillTile(terrainStaticCtx, x, y, cell, tile.tone, accent);
+          }
+
+          if (accent) {
+            terrainState.terrainAccent.push(tile);
+          }
+        }
+      }
+
+      renderScene(terrainState.currentRift);
+    }
+
+    function renderScene(rift) {
+      return; // Space atmosphere now uses composited CSS layers.
+
+      const width = terrainState.width;
+      const height = terrainState.height;
+      const pageProgress = getPageProgress();
+      const realms = getRealmMixes(pageProgress);
+      const anomaly = terrainState.anomaly;
+      const blackholeAlpha = 1 - smoothStep(0.14, 0.8, rift);
+      const terrainAlpha = smoothStep(0.2, 0.84, rift);
+      const layerShiftX = -realms.about * 5.5 + realms.work * 14 - realms.contact * 7 + anomaly.x;
+      const layerShiftY = realms.about * 2.2 - realms.work * 3.2 + realms.contact * 8.4 + anomaly.y;
+
+      terrainCtx.clearRect(0, 0, width, height);
+
+      if (blackholeAlpha > 0.002) {
+        terrainCtx.save();
+        terrainCtx.globalAlpha = blackholeAlpha;
+        terrainCtx.drawImage(
+          terrainState.singularityStatic,
+          layerShiftX * 0.14 + anomaly.split * 0.3,
+          layerShiftY * 0.08,
+          width,
+          height
+        );
+        terrainCtx.restore();
+
+        terrainState.singularityDynamic.forEach((tile) => {
+          const local = clamp((rift - tile.delay) / 0.42, 0, 1);
+          const ease = 1 - Math.pow(1 - local, 3);
+          const realmWarpX =
+            Math.sin(tile.row * 0.21 + pageProgress * 7.2) * (realms.about * 1.8 + realms.work * 1.6 + anomaly.pulse * 1.5) +
+            (((tile.row + tile.col) % 6) - 2.5) * anomaly.split * 0.22;
+          const realmWarpY =
+            Math.cos(tile.col * 0.16 - pageProgress * 5.8) * (realms.work * 1.4 + realms.contact * 1 + anomaly.pulse * 0.9);
+          const dx = tile.shiftX * ease + realmWarpX;
+          const dy = tile.shiftY * ease + realmWarpY;
+          const alpha = blackholeAlpha * (1 - ease * 0.22);
+          const titleBand = Math.abs(tile.y + dy - height * 0.34) < height * 0.12;
+          const softenedAlpha = titleBand ? alpha * 0.38 : alpha;
+          const tone = local > 0.42 ? tile.toneShift : tile.tone;
+
+          fillTile(terrainCtx, tile.x + dx, tile.y + dy, tile.size, tone, tile.accent, softenedAlpha);
+        });
+      }
+
+      if (terrainAlpha > 0.002) {
+        terrainCtx.save();
+        terrainCtx.globalAlpha = terrainAlpha;
+        terrainCtx.drawImage(
+          terrainState.terrainStatic,
+          -layerShiftX * 0.1 + anomaly.split * 0.6,
+          layerShiftY * 0.12,
+          width,
+          height
+        );
+        terrainCtx.restore();
+
+        terrainState.terrainDynamic.forEach((tile, index) => {
+          const local = clamp((rift - 0.22 - tile.delay * 0.34) / 0.44, 0, 1);
+          const ease = smoothStep(0, 1, local);
+          const fieldWarpX =
+            Math.sin(tile.y * 0.014 + pageProgress * 8.2 + tile.x * 0.003) *
+            (realms.work * 4.2 + realms.contact * 3 + anomaly.pulse * 2.1);
+          const fieldWarpY =
+            Math.cos(tile.x * 0.011 - pageProgress * 6.7 + tile.y * 0.002) *
+            (realms.contact * 3.6 + realms.work * 1.1 + anomaly.pulse * 1.35);
+          const dx = tile.shiftX * (1 - ease) * -1 + fieldWarpX + (((index % 5) - 2) * anomaly.split * 0.34);
+          const dy = tile.shiftY * (1 - ease) * -1 + fieldWarpY;
+          const alpha = terrainAlpha * (0.62 + ease * 0.38) * (1 - realms.about * 0.04 + realms.contact * 0.08);
+          const tone = local > 0.42 ? tile.tone : tile.toneShift;
+
+          fillTile(terrainCtx, tile.x + dx, tile.y + dy, tile.size, tone, tile.accent, alpha);
+
+          if (tile.accent && rift > 0.24 && (index + Math.floor(rift * 10 + pageProgress * 13)) % 4 === 0) {
+            terrainCtx.save();
+            terrainCtx.globalAlpha = alpha * (0.12 + realms.contact * 0.08);
+            terrainCtx.fillStyle = realms.work > 0.36 ? "#162f58" : "#4a111a";
+            terrainCtx.fillRect(tile.x + dx, tile.y + dy, tile.size, tile.size);
+            terrainCtx.restore();
+          }
+        });
+      }
+    }
+
+    function getHeroProgress() {
+      if (!heroStage) {
+        return 0;
+      }
+
+      const distance = Math.max(heroStage.offsetHeight - window.innerHeight, 1);
+      return clamp(window.scrollY / distance, 0, 1);
+    }
+
+    function getSectionProgress(section) {
+      const rect = section.getBoundingClientRect();
+      const travel = window.innerHeight * 1.28 + rect.height * 0.96;
+      return clamp((window.innerHeight - rect.top) / Math.max(travel, 1), 0, 1);
+    }
+
+    function getSectionFocus(section) {
+      const rect = section.getBoundingClientRect();
+      const center = rect.top + rect.height * 0.5;
+      const target = window.innerHeight * 0.58;
+      return 1 - clamp(Math.abs(center - target) / Math.max(window.innerHeight * 1.08, 1), 0, 1);
+    }
+
+    function getPageProgress() {
+      const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      return clamp(window.scrollY / maxScroll, 0, 1);
+    }
+
+    function getRealmMixes(progress) {
+      return {
+        about: smoothStep(0.1, 0.34, progress),
+        work: smoothStep(0.36, 0.68, progress),
+        contact: smoothStep(0.7, 0.96, progress)
+      };
+    }
+
+    function updateWorldSections() {
+      sections.forEach((section) => {
+        const progress = getSectionProgress(section);
+        const focus = getSectionFocus(section);
+        const axis = Number(section.dataset.axis || 1);
+        const drift = (1 - progress) * axis * 40 + (0.5 - focus) * axis * 12;
+        const contentShift = (0.5 - focus) * axis * -10;
+
+        section.style.setProperty("--section-progress", progress.toFixed(3));
+        section.style.setProperty("--section-drift", `${drift.toFixed(2)}px`);
+        section.style.setProperty("--section-content-shift", `${contentShift.toFixed(2)}px`);
+        section.style.setProperty("--section-axis", axis);
+      });
+
+      panels.forEach((panel) => {
+        const host = panel.closest(".section");
+        if (!host) return;
+
+        const progress = getSectionProgress(host);
+        const threshold = panel.parentElement?.children
+          ? [...panel.parentElement.children].indexOf(panel) * 0.12
+          : 0;
+        const open = clamp((progress - threshold) / 0.72, 0, 1);
+        panel.style.setProperty("--panel-open", open.toFixed(3));
+      });
+
+      const fragmentsSection = document.getElementById("fragments");
+      if (fragmentsSection) {
+        const worksProgress = getSectionProgress(fragmentsSection);
+
+        workCards.forEach((card, index) => {
+          const open = clamp((worksProgress - 0.18 - index * 0.08) / 0.64, 0, 1);
+          card.style.setProperty("--card-open", open.toFixed(3));
+        });
+      }
+    }
+
+    function mutateText(value) {
+      const glyphs = ["▦", "∴", "⌇", "⊘", "⋯", "░", "◌", "¦", "·"];
+      const chars = [...value];
+      const mutableIndexes = chars
+        .map((char, index) => ({ char, index }))
+        .filter(({ char }) => char.trim() && !["&", ";"].includes(char))
+        .map(({ index }) => index);
+
+      if (mutableIndexes.length === 0) {
+        return value;
+      }
+
+      const segmentLength = Math.min(
+        mutableIndexes.length,
+        value.length > 18 ? 3 : 2 + Math.floor(Math.random() * 2)
+      );
+      let bestSegment = [mutableIndexes[0]];
+      let currentSegment = [mutableIndexes[0]];
+
+      for (let index = 1; index < mutableIndexes.length; index += 1) {
+        const current = mutableIndexes[index];
+        const previous = mutableIndexes[index - 1];
+
+        if (current === previous + 1) {
+          currentSegment.push(current);
+        } else {
+          if (currentSegment.length >= bestSegment.length) {
+            bestSegment = currentSegment;
+          }
+          currentSegment = [current];
+        }
+      }
+
+      if (currentSegment.length >= bestSegment.length) {
+        bestSegment = currentSegment;
+      }
+
+      let selected = bestSegment;
+      if (bestSegment.length > segmentLength) {
+        const start = Math.floor(Math.random() * (bestSegment.length - segmentLength + 1));
+        selected = bestSegment.slice(start, start + segmentLength);
+      } else if (bestSegment.length < segmentLength) {
+        const startIndex = Math.floor(Math.random() * Math.max(mutableIndexes.length - bestSegment.length, 1));
+        selected = mutableIndexes.slice(startIndex, startIndex + bestSegment.length);
+      }
+
+      selected.forEach((index) => {
+        chars[index] = glyphs[Math.floor(Math.random() * glyphs.length)];
+      });
+
+      return chars.join("");
+    }
+
+    function applyFaultText(target, value) {
+      target.textContent = value;
+
+      if (target.classList.contains("hero-title")) {
+        target.setAttribute("data-text", value);
+      }
+    }
+
+    function scheduleObservationFault() {
+      if (document.documentElement.dataset.capture === "true") return;
+      window.clearTimeout(terrainState.faultTimer);
+      terrainState.faultTimer = window.setTimeout(() => {
+        triggerObservationFault();
+      }, 2000 + Math.random() * 3000);
+    }
+
+    function triggerObservationFault() {
+      const visibleTargets = textTargets.filter((target) => {
+        const rect = target.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight && !target.classList.contains("is-observing-fault");
+      });
+
+      if (!visibleTargets.length) {
+        scheduleObservationFault();
+        return;
+      }
+
+      const burstSeed = Math.random();
+      const burstCount = burstSeed < 0.16 ? 3 : burstSeed < 0.46 ? 2 : 1;
+      const chosen = [...visibleTargets]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, burstCount);
+
+      chosen.forEach((target, index) => {
+        const original = target.dataset.originalText || target.textContent;
+        const glitched = mutateText(original);
+
+        window.setTimeout(() => {
+          target.classList.add("is-observing-fault");
+          applyFaultText(target, glitched);
+
+          window.setTimeout(() => {
+            applyFaultText(target, original);
+            target.classList.remove("is-observing-fault");
+          }, 400 + Math.random() * 400);
+        }, index * 100);
+      });
+
+      scheduleObservationFault();
+    }
+
+    function scheduleSpatialInstability() {
+      window.clearTimeout(terrainState.anomalyTimer);
+      terrainState.anomalyTimer = window.setTimeout(() => {
+        triggerSpatialInstability();
+      }, 1800 + Math.random() * 2600);
+    }
+
+    function triggerSpatialInstability() {
+      const anomaly = terrainState.anomaly;
+      const strength = 0.48 + Math.random() * 1.05;
+      anomaly.targetX = (Math.random() - 0.5) * 18 * strength;
+      anomaly.targetY = (Math.random() - 0.5) * 12 * strength;
+      anomaly.targetPulse = 0.22 + Math.random() * 0.78;
+      anomaly.targetShear = (Math.random() - 0.5) * 1.4 * strength;
+      anomaly.targetSplit = (Math.random() - 0.5) * 2.3 * strength;
+
+      scheduleRender();
+      window.clearTimeout(terrainState.anomalyReleaseTimer);
+      terrainState.anomalyReleaseTimer = window.setTimeout(() => {
+        anomaly.targetX *= 0.08;
+        anomaly.targetY *= 0.08;
+        anomaly.targetPulse = 0;
+        anomaly.targetShear *= 0.08;
+        anomaly.targetSplit = 0;
+        scheduleRender();
+      }, 1100 + Math.random() * 1400);
+
+      scheduleSpatialInstability();
+    }
+
+    function applyTitleState(rift) {
+      const fade = 1 - rift * 0.88;
+      const pageProgress = getPageProgress();
+      const realms = getRealmMixes(pageProgress);
+      const anomaly = terrainState.anomaly;
+      document.documentElement.style.setProperty("--title-fade", fade.toFixed(3));
+      document.documentElement.style.setProperty("--ghost-shift", `${rift * 12}px`);
+      document.documentElement.style.setProperty("--ghost-alpha", `${rift * 0.22}`);
+      document.documentElement.style.setProperty(
+        "--field-glow",
+        `${(0.28 - rift * 0.14 + realms.about * 0.02 + realms.work * 0.05 + realms.contact * 0.08 + anomaly.pulse * 0.03).toFixed(3)}`
+      );
+      document.documentElement.style.setProperty(
+        "--field-grid",
+        `${(0.16 + rift * 0.02 + realms.work * 0.05 + realms.contact * 0.07).toFixed(3)}`
+      );
+      document.documentElement.style.setProperty(
+        "--field-shift-x",
+        `${(rift * 14 + realms.about * 10 + realms.work * 40 + realms.contact * 58 + anomaly.x).toFixed(2)}px`
+      );
+      document.documentElement.style.setProperty(
+        "--field-shift-y",
+        `${(rift * 7 + realms.about * 6 + realms.work * 18 + realms.contact * 30 + anomaly.y).toFixed(2)}px`
+      );
+      document.documentElement.style.setProperty("--world-tint", `${(pageProgress + realms.contact * 0.12).toFixed(3)}`);
+      document.documentElement.style.setProperty("--world-depth", `${(pageProgress * 1.1 + anomaly.pulse * 0.12).toFixed(3)}`);
+      document.documentElement.style.setProperty("--world-grid-size", `${(36 - realms.about * 1 + realms.work * 4 + realms.contact * 7).toFixed(2)}px`);
+      document.documentElement.style.setProperty("--world-layer-shift-x", `${(anomaly.split * 4.2 + realms.work * 8).toFixed(2)}px`);
+      document.documentElement.style.setProperty("--world-layer-shift-y", `${(anomaly.y * 0.7 + realms.contact * 6).toFixed(2)}px`);
+      document.documentElement.style.setProperty("--world-tilt", `${(anomaly.shear * 1.1).toFixed(3)}deg`);
+      document.documentElement.style.setProperty("--terrain-shear-x", `${(anomaly.x * 0.72 - realms.about * 2 + realms.work * 6).toFixed(2)}px`);
+      document.documentElement.style.setProperty("--terrain-shear-y", `${(anomaly.y * 0.46 + realms.contact * 4.6).toFixed(2)}px`);
+      document.documentElement.style.setProperty("--terrain-scale", `${(anomaly.pulse * 0.01 + realms.contact * 0.006).toFixed(4)}`);
+
+      if (heroTitle) {
+        heroTitle.style.filter = `blur(${rift * 0.18}px)`;
+      }
+    }
+
+    function animateScene() {
+      terrainState.frameId = 0;
+      const diff = terrainState.targetRift - terrainState.currentRift;
+      const anomaly = terrainState.anomaly;
+
+      if (Math.abs(diff) < 0.002) {
+        terrainState.currentRift = terrainState.targetRift;
+      } else {
+        terrainState.currentRift += diff * 0.16;
+      }
+
+      anomaly.x = mix(anomaly.x, anomaly.targetX, 0.08);
+      anomaly.y = mix(anomaly.y, anomaly.targetY, 0.08);
+      anomaly.pulse = mix(anomaly.pulse, anomaly.targetPulse, 0.08);
+      anomaly.shear = mix(anomaly.shear, anomaly.targetShear, 0.08);
+      anomaly.split = mix(anomaly.split, anomaly.targetSplit, 0.08);
+
+      renderScene(terrainState.currentRift);
+      applyTitleState(terrainState.currentRift);
+
+      const anomalyDiff =
+        Math.abs(anomaly.targetX - anomaly.x) +
+        Math.abs(anomaly.targetY - anomaly.y) +
+        Math.abs(anomaly.targetPulse - anomaly.pulse) +
+        Math.abs(anomaly.targetShear - anomaly.shear) +
+        Math.abs(anomaly.targetSplit - anomaly.split);
+
+      if (Math.abs(terrainState.targetRift - terrainState.currentRift) > 0.002 || anomalyDiff > 0.01) {
+        scheduleRender();
+      }
+    }
+
+    function scheduleRender() {
+      if (terrainState.frameId) {
+        return;
+      }
+
+      terrainState.frameId = window.requestAnimationFrame(animateScene);
+    }
+
+    function updateSceneState() {
+      const progress = getHeroProgress();
+      terrainState.targetRift = clamp((progress - 0.12) / 0.78, 0, 1);
+      updateWorldSections();
+      scheduleRender();
+    }
+
+    function observeSections() {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+            }
+          });
+        },
+        { threshold: 0.16 }
+      );
+
+      revealItems.forEach((item) => observer.observe(item));
+    }
+
+    function handleResize() {
+      // CSS space layers resize with the viewport.
+      updateSceneState();
+    }
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", updateSceneState, { passive: true });
+
+    textTargets.forEach((target) => {
+      target.dataset.originalText = target.textContent;
+    });
+
+    // Former tile renderer is retained as source, but no longer started.
+    observeSections();
+    updateSceneState();
+    scheduleObservationFault();
+    // Atmospheric movement is handled by CSS.
+  </script>
+<script>
+document.querySelectorAll('.work-card').forEach(card=>{if(card.querySelector('.pending-note'))card.classList.add('pending');});
+const navLinks=[...document.querySelectorAll('.site-nav a')];
+const navObserver=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){navLinks.forEach(link=>{if(link.hash==='#'+entry.target.id)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});}});},{rootMargin:'-15% 0px -55% 0px',threshold:0});
+document.querySelectorAll('section[id]:not([hidden])').forEach(section=>navObserver.observe(section));
+document.addEventListener('visibilitychange',()=>document.body.classList.toggle('atmosphere-paused',document.hidden));
+</script></body>
+</html>
